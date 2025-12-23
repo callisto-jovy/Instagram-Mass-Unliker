@@ -11,7 +11,9 @@ const String version = '0.0.1';
 
 final Directory workDir = Directory('instagram_unliker')..createSync();
 
-final File cookieFile = File(path.join(workDir.path, "unliker_cookies.json"))..createSync();
+final File configFile = File("config.json");
+final File cookieFile = File(path.join(workDir.path, "unliker_cookies.json"))
+  ..createSync();
 
 Future<List<CookieParam>> grabCookiesFromLastSession() async {
   final List<CookieParam> cookies = [];
@@ -35,10 +37,13 @@ Future<void> dumpCookiesFromSession(final List<net.Cookie> cookies) async {
   await cookieFile.writeAsString(encodedJson);
 }
 
-Future<ElementHandle> findButton({required Page page, required String buttonText, bool isSpan = false}) async {
+Future<ElementHandle> findButton({
+  required Page page,
+  required String buttonText,
+  bool isSpan = false,
+}) async {
   if (isSpan) {
     if (isSpan) {
-
       // After 30 seconds we reload the page and try again by resorting and then continuing
       final Timer waitFuture = Timer(Duration(seconds: 30), () async {
         await page.reload();
@@ -58,7 +63,9 @@ Future<ElementHandle> findButton({required Page page, required String buttonText
       waitFuture.cancel();
 
       // Now find and return the matching span
-      final List<ElementHandle> spans = await page.$$('div[class="wbloks_1"] > span');
+      final List<ElementHandle> spans = await page.$$(
+        'div[class="wbloks_1"] > span',
+      );
 
       for (final span in spans) {
         final textProp = await span.property('textContent');
@@ -72,7 +79,9 @@ Future<ElementHandle> findButton({required Page page, required String buttonText
     }
   }
 
-  final ElementHandle? handle = await page.waitForSelector('div[role="button"][aria-label="$buttonText"]');
+  final ElementHandle? handle = await page.waitForSelector(
+    'div[role="button"][aria-label="$buttonText"]',
+  );
 
   if (handle != null) {
     return handle;
@@ -83,20 +92,46 @@ Future<ElementHandle> findButton({required Page page, required String buttonText
 
 Future<void> applySorting(final Page page) async {
   // get sort button and click it
-  final ElementHandle sortButton = await findButton(page: page, buttonText: 'Sortieren und filtern');
+  final ElementHandle sortButton = await findButton(
+    page: page,
+    buttonText: 'Sortieren und filtern',
+  );
   await sortButton.click(delay: Duration(milliseconds: 500));
 
   // Click sort option: Älteste zuerst
-  final ElementHandle sortingButton = await findButton(page: page, buttonText: 'Älteste zuerst');
+  final ElementHandle sortingButton = await findButton(
+    page: page,
+    buttonText: 'Älteste zuerst',
+  );
   await sortingButton.click();
 
-  final ElementHandle applyButton = await findButton(page: page, buttonText: 'Übernehmen');
+  final ElementHandle applyButton = await findButton(
+    page: page,
+    buttonText: 'Übernehmen',
+  );
   await applyButton.click();
+}
+
+Future<List<ElementHandle>> grabPosts(final Page page) async {
+  await page.waitForSelector(
+    'div[role="button"][aria-label="Image with button"]',
+  );
+
+  // Check if new posts were loaded
+  final List<ElementHandle> loadedPosts = await page.$$(
+    'div[role="button"][aria-label="Image with button"]',
+  );
+
+  return loadedPosts;
 }
 
 Future<void> startUnliking(final Page page) async {
   // Click select button
-  final ElementHandle selectButton = await findButton(page: page, buttonText: 'Auswählen', isSpan: true);
+  final ElementHandle selectButton = await findButton(
+    page: page,
+    buttonText: 'Auswählen',
+    isSpan: true,
+  );
   await selectButton.click();
 
   // Sometimes the button is clicked before it appears, triggering nothing.
@@ -106,17 +141,25 @@ Future<void> startUnliking(final Page page) async {
     await selectButton.click();
   });
 
-
-  await page.waitForSelector('div[role="button"][aria-label="Image with button"]');
-
+  // wait for the clickable tiles to show up
+  await page.waitForSelector(
+    'div[role="button"][aria-label="Image with button"]',
+  );
+  // Tiles showed up -> Button has been pressed successfully -> Cancel the re-click.
   reClickTimer.cancel();
 
-  final ElementHandle unlikeButton = await findButton(page: page, buttonText: 'Gefällt mir nicht mehr');
-  // Select the posts and scroll. Do this one hundred at a time. Funnily enough, the posts are buttons.
-  final Queue<ElementHandle> posts = Queue.from(await page.$$('div[role="button"][aria-label="Image with button"]'));
+  final ElementHandle unlikeButton = await findButton(
+    page: page,
+    buttonText: 'Gefällt mir nicht mehr',
+  );
 
-  // Filter for all the posts that are labeled "image with button"
+  // Select the posts and scroll. Do this one hundred at a time.
+  final Queue<ElementHandle> posts = Queue.from(
+    await grabPosts(page)
+  );
+
   int clickedPosts = 0;
+  // Skip the posts we've already selected.
   int previousPostCount = posts.length;
 
   while (clickedPosts < 90) {
@@ -132,7 +175,7 @@ Future<void> startUnliking(final Page page) async {
       await Future.delayed(Duration(seconds: 2));
 
       // Check if new posts were loaded
-      final List<ElementHandle> loadedPosts = await page.$$('div[role="button"][aria-label="Image with button"]');
+      final List<ElementHandle> loadedPosts = await grabPosts(page);
 
       if (loadedPosts.length > previousPostCount) {
         // New posts loaded, update iterator
@@ -140,7 +183,7 @@ Future<void> startUnliking(final Page page) async {
         previousPostCount = loadedPosts.length;
       } else {
         // No new posts - we've reached the end
-        print('Reached end of scrollable content');
+        print('Reached end of scrollable content.');
         break;
       }
     }
@@ -159,6 +202,11 @@ Future<void> startUnliking(final Page page) async {
 }
 
 void main(List<String> arguments) async {
+  if (!await configFile.exists()) {
+    print("Please configure the program with the appropriate config");
+    exit(-1);
+  }
+
   // https://www.instagram.com/your_activity/interactions/likes/
 
   var browser = await puppeteer.launch(headless: false);
@@ -181,7 +229,6 @@ void main(List<String> arguments) async {
     await dumpCookiesFromSession(await page.cookies());
   }
 
-
   while (true) {
     // Find button to sort and sort accordingly -- first to last
     await applySorting(page);
@@ -189,7 +236,6 @@ void main(List<String> arguments) async {
     await startUnliking(page);
 
     await page.reload();
-
   }
   await browser.close();
 }
