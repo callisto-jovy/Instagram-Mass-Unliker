@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
@@ -37,6 +38,13 @@ Future<void> dumpCookiesFromSession(final List<net.Cookie> cookies) async {
 Future<ElementHandle> findButton({required Page page, required String buttonText, bool isSpan = false}) async {
   if (isSpan) {
     if (isSpan) {
+
+      // After 30 seconds we reload the page and try again by resorting and then continuing
+      final Timer waitFuture = Timer(Duration(seconds: 30), () async {
+        await page.reload();
+        await applySorting(page);
+      });
+
       // Wait for span with specific text using waitForFunction
       await page.waitForFunction(
         '''(text) => {
@@ -46,6 +54,8 @@ Future<ElementHandle> findButton({required Page page, required String buttonText
         args: [buttonText],
         timeout: Duration(seconds: 360),
       );
+
+      waitFuture.cancel();
 
       // Now find and return the matching span
       final List<ElementHandle> spans = await page.$$('div[class="wbloks_1"] > span');
@@ -80,7 +90,7 @@ Future<void> applySorting(final Page page) async {
   final ElementHandle sortButton = await findButton(page: page, buttonText: 'Sortieren und filtern');
   await sortButton.click(delay: Duration(milliseconds: 500));
 
-  // Click sort option: Älteste zuerst
+  // Click sort option: Älteste zuerstр
   final ElementHandle sortingButton = await findButton(page: page, buttonText: 'Älteste zuerst');
   await sortingButton.click();
 
@@ -141,7 +151,6 @@ Future<void> startUnliking(final Page page) async {
   final ElementHandle unlikeConfirm = await page.$("._a9--._ap36._a9_1");
   await unlikeConfirm.click(delay: Duration(seconds: 5));
 }
-
 
 void main(List<String> arguments) async {
   // https://www.instagram.com/your_activity/interactions/likes/
