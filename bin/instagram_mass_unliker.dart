@@ -81,16 +81,12 @@ Future<ElementHandle> findButton({required Page page, required String buttonText
   return Future.error("Could not find button with text $buttonText.");
 }
 
-Future<List<ElementHandle>> getButtonsOnPage(final Page page) {
-  return page.$$('div[role="button"]');
-}
-
 Future<void> applySorting(final Page page) async {
   // get sort button and click it
   final ElementHandle sortButton = await findButton(page: page, buttonText: 'Sortieren und filtern');
   await sortButton.click(delay: Duration(milliseconds: 500));
 
-  // Click sort option: Älteste zuerstр
+  // Click sort option: Älteste zuerst
   final ElementHandle sortingButton = await findButton(page: page, buttonText: 'Älteste zuerst');
   await sortingButton.click();
 
@@ -103,7 +99,17 @@ Future<void> startUnliking(final Page page) async {
   final ElementHandle selectButton = await findButton(page: page, buttonText: 'Auswählen', isSpan: true);
   await selectButton.click();
 
+  // Sometimes the button is clicked before it appears, triggering nothing.
+  // Retry after about 10 seconds if the click succeeded
+  Timer reClickTimer = Timer(Duration(seconds: 10), () async {
+    print("Re-Click timer hit.");
+    await selectButton.click();
+  });
+
+
   await page.waitForSelector('div[role="button"][aria-label="Image with button"]');
+
+  reClickTimer.cancel();
 
   final ElementHandle unlikeButton = await findButton(page: page, buttonText: 'Gefällt mir nicht mehr');
   // Select the posts and scroll. Do this one hundred at a time. Funnily enough, the posts are buttons.
@@ -139,7 +145,7 @@ Future<void> startUnliking(final Page page) async {
       }
     }
 
-    await posts.removeFirst().click(delay: Duration(milliseconds: 200));
+    await posts.removeFirst().click(delay: Duration(milliseconds: 100));
     clickedPosts++;
   }
 
@@ -175,11 +181,15 @@ void main(List<String> arguments) async {
     await dumpCookiesFromSession(await page.cookies());
   }
 
-  // Find button to sort and sort accordingly -- first to last
-  await applySorting(page);
 
   while (true) {
+    // Find button to sort and sort accordingly -- first to last
+    await applySorting(page);
+
     await startUnliking(page);
+
+    await page.reload();
+
   }
   await browser.close();
 }
