@@ -5,6 +5,6 @@
   "select_button_text": "Auswählen",
   "unlike_button_text": "Gefällt mir nicht mehr",
   "selection_delay": 200,
-  "re_click_timer_delay": 10.000
+  "re_click_timer_delay": 10000
 
 }

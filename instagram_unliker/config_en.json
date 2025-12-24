@@ -6,5 +6,5 @@
   "select_button_text": "Select",
   "unlike_button_text": "Unlike",
   "selection_delay": 200,
-  "re_click_timer_delay": 10.000
+  "re_click_timer_delay": 10000
 }
