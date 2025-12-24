@@ -1,0 +1,10 @@
+{
+
+  "sort_button_text": "Sort & filter",
+  "sort_option_button_text": "Oldest to newest",
+  "appy_button_text": "Apply",
+  "select_button_text": "Select",
+  "unlike_button_text": "Unlike",
+  "selection_delay": 200,
+  "re_click_timer_delay": 10.000
+}

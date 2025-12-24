@@ -11,9 +11,11 @@ const String version = '0.0.1';
 
 final Directory workDir = Directory('instagram_unliker')..createSync();
 
-final File configFile = File("config.json");
-final File cookieFile = File(path.join(workDir.path, "unliker_cookies.json"))
-  ..createSync();
+final File configFile = File(path.join(workDir.path, "config_en.json"));
+final File cookieFile = File(path.join(workDir.path, "unliker_cookies.json"))..createSync();
+
+// Yeah, this sucks, but works
+final dynamic config = jsonDecode(configFile.readAsStringSync());
 
 Future<List<CookieParam>> grabCookiesFromLastSession() async {
   final List<CookieParam> cookies = [];
@@ -37,11 +39,7 @@ Future<void> dumpCookiesFromSession(final List<net.Cookie> cookies) async {
   await cookieFile.writeAsString(encodedJson);
 }
 
-Future<ElementHandle> findButton({
-  required Page page,
-  required String buttonText,
-  bool isSpan = false,
-}) async {
+Future<ElementHandle> findButton({required Page page, required String buttonText, bool isSpan = false}) async {
   if (isSpan) {
     if (isSpan) {
       // After 30 seconds we reload the page and try again by resorting and then continuing
@@ -63,9 +61,7 @@ Future<ElementHandle> findButton({
       waitFuture.cancel();
 
       // Now find and return the matching span
-      final List<ElementHandle> spans = await page.$$(
-        'div[class="wbloks_1"] > span',
-      );
+      final List<ElementHandle> spans = await page.$$('div[class="wbloks_1"] > span');
 
       for (final span in spans) {
         final textProp = await span.property('textContent');
@@ -79,9 +75,7 @@ Future<ElementHandle> findButton({
     }
   }
 
-  final ElementHandle? handle = await page.waitForSelector(
-    'div[role="button"][aria-label="$buttonText"]',
-  );
+  final ElementHandle? handle = await page.waitForSelector('div[role="button"][aria-label="$buttonText"]');
 
   if (handle != null) {
     return handle;
@@ -92,71 +86,47 @@ Future<ElementHandle> findButton({
 
 Future<void> applySorting(final Page page) async {
   // get sort button and click it
-  final ElementHandle sortButton = await findButton(
-    page: page,
-    buttonText: 'Sortieren und filtern',
-  );
+  final ElementHandle sortButton = await findButton(page: page, buttonText: config['sort_button_text']);
   await sortButton.click(delay: Duration(milliseconds: 500));
 
   // Click sort option: Älteste zuerst
-  final ElementHandle sortingButton = await findButton(
-    page: page,
-    buttonText: 'Älteste zuerst',
-  );
+  final ElementHandle sortingButton = await findButton(page: page, buttonText: config['sort_option_button_text']);
   await sortingButton.click();
 
-  final ElementHandle applyButton = await findButton(
-    page: page,
-    buttonText: 'Übernehmen',
-  );
+  final ElementHandle applyButton = await findButton(page: page, buttonText: config['appy_button_text']);
   await applyButton.click();
 }
 
 Future<List<ElementHandle>> grabPosts(final Page page) async {
-  await page.waitForSelector(
-    'div[role="button"][aria-label="Image with button"]',
-  );
+  await page.waitForSelector('div[role="button"][aria-label="Image with button"]');
 
   // Check if new posts were loaded
-  final List<ElementHandle> loadedPosts = await page.$$(
-    'div[role="button"][aria-label="Image with button"]',
-  );
+  final List<ElementHandle> loadedPosts = await page.$$('div[role="button"][aria-label="Image with button"]');
 
   return loadedPosts;
 }
 
 Future<void> startUnliking(final Page page) async {
   // Click select button
-  final ElementHandle selectButton = await findButton(
-    page: page,
-    buttonText: 'Auswählen',
-    isSpan: true,
-  );
+  final ElementHandle selectButton = await findButton(page: page, buttonText: config['select_button_text'], isSpan: true);
   await selectButton.click();
 
   // Sometimes the button is clicked before it appears, triggering nothing.
   // Retry after about 10 seconds if the click succeeded
-  Timer reClickTimer = Timer(Duration(seconds: 10), () async {
+  Timer reClickTimer = Timer(Duration(milliseconds: config['re_click_timer_delay']), () async {
     print("Re-Click timer hit.");
     await selectButton.click();
   });
 
   // wait for the clickable tiles to show up
-  await page.waitForSelector(
-    'div[role="button"][aria-label="Image with button"]',
-  );
+  await page.waitForSelector('div[role="button"][aria-label="Image with button"]');
   // Tiles showed up -> Button has been pressed successfully -> Cancel the re-click.
   reClickTimer.cancel();
 
-  final ElementHandle unlikeButton = await findButton(
-    page: page,
-    buttonText: 'Gefällt mir nicht mehr',
-  );
+  final ElementHandle unlikeButton = await findButton(page: page, buttonText: config['unlike_button_text']);
 
   // Select the posts and scroll. Do this one hundred at a time.
-  final Queue<ElementHandle> posts = Queue.from(
-    await grabPosts(page)
-  );
+  final Queue<ElementHandle> posts = Queue.from(await grabPosts(page));
 
   int clickedPosts = 0;
   // Skip the posts we've already selected.
@@ -188,11 +158,16 @@ Future<void> startUnliking(final Page page) async {
       }
     }
 
-    await posts.removeFirst().click(delay: Duration(milliseconds: 100));
-    clickedPosts++;
+    try {
+      await posts.removeFirst().click(delay: Duration(milliseconds: config['selection_delay']));
+      clickedPosts++;
+    } catch (e) {
+      // Ignore exceptions, just skip to the next element. Click might not be valid because of "null"-posts
+      print(e);
+    }
   }
 
-  await unlikeButton.click(delay: Duration(milliseconds: 200));
+  await unlikeButton.click(delay: Duration(milliseconds: config['selection_delay']));
   // Popup appears, confirm popup
   // Unlike button: ._a9--._ap36._a9_1
 

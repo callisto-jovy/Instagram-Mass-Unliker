@@ -1,0 +1,10 @@
+{
+  "sort_button_text": "Sortieren und filtern",
+  "sort_option_button_text": "Älteste zuerst",
+  "appy_button_text": "Übernehmen",
+  "select_button_text": "Auswählen",
+  "unlike_button_text": "Gefällt mir nicht mehr",
+  "selection_delay": 200,
+  "re_click_timer_delay": 10.000
+
+}
