@@ -11,7 +11,7 @@ const String version = '0.0.1';
 
 final Directory workDir = Directory('instagram_unliker')..createSync();
 
-final File configFile = File(path.join(workDir.path, "config_en.json"));
+final File configFile = File(path.join(workDir.path, "config_de.json"));
 final File cookieFile = File(path.join(workDir.path, "unliker_cookies.json"))..createSync();
 
 // Yeah, this sucks, but works
@@ -142,7 +142,7 @@ Future<void> startUnliking(final Page page) async {
       }
     }''');
 
-      await Future.delayed(Duration(seconds: 2));
+      await Future.delayed(Duration(seconds: 10));
 
       // Check if new posts were loaded
       final List<ElementHandle> loadedPosts = await grabPosts(page);
